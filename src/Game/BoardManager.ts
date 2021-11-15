@@ -1,9 +1,8 @@
-import { threadId } from 'worker_threads';
 import { Publisher } from '../Tech/PublisherManager';
 
 export namespace Table {
 
-    export enum color {
+    export enum Color {
         EMPTY = -1,
         BLACK = 0,
         WHITE = 1
@@ -15,12 +14,20 @@ export namespace Table {
     colors[1] = "White";
 
     export class Line {
-        private _pieces: number = 0;
-        _color: color;
+        static LineCounter = 0;
 
-        constructor(pieces: number, color: color) {
+        private _lineId: number = 0;
+        private _pieces: number = 0;
+        private _color: Color;
+
+        constructor(pieces: number, Color: Color) {
+            this._lineId = Line.LineCounter++;
             this._pieces = pieces;
-            this._color = color;
+            this._color = Color;
+        }
+
+        public get lineId(): number {
+            return this._lineId;
         }
 
         public get pieces(): number {
@@ -30,13 +37,19 @@ export namespace Table {
             this._pieces = value;
         }
 
+        public resetLineCounter() {
+            console.log("Resetting Line Counter");
+
+            Line.LineCounter = 0;
+        }
+
         public isEmpty(): boolean {
-            return this._color == color.EMPTY;
+            return this._color == Color.EMPTY;
         }
 
         checkForColorChanges(): void {
             if (this._pieces == 0) {
-                this._color = color.EMPTY;
+                this._color = Color.EMPTY;
                 this._color = ~this._color;
             }
             else {
@@ -66,19 +79,37 @@ export namespace Table {
     }
 
     export class Board {
+
+        static LinesPerQuarter = 6;
+
         //Starting bottom right, playing black
-        private static _defaultBoardState: Array<Line> =
-            [new Line(2, color.WHITE), new Line(0, color.EMPTY), new Line(0, color.EMPTY), new Line(0, color.EMPTY), new Line(0, color.EMPTY), new Line(5, color.BLACK),
-            new Line(0, color.EMPTY), new Line(3, color.BLACK), new Line(0, color.EMPTY), new Line(0, color.EMPTY), new Line(0, color.EMPTY), new Line(5, color.WHITE),
-            new Line(2, color.BLACK), new Line(0, color.EMPTY), new Line(0, color.EMPTY), new Line(0, color.EMPTY), new Line(0, color.EMPTY), new Line(5, color.WHITE),
-            new Line(0, color.EMPTY), new Line(3, color.WHITE), new Line(0, color.EMPTY), new Line(0, color.EMPTY), new Line(0, color.EMPTY), new Line(5, color.BLACK)]
+        private static DefaultBoardState: Array<Line> =
+            [new Line(2, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK),
+             new Line(0, Color.EMPTY), new Line(3, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
+             new Line(2, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
+             new Line(0, Color.EMPTY), new Line(3, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK)]
 
-        private _boardState: Array<Line> = Board._defaultBoardState;
+        private static WhiteBoardState: Array<Line> =
+            [new Line(2, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
+             new Line(0, Color.EMPTY), new Line(3, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK),
+             new Line(2, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK),
+             new Line(0, Color.EMPTY), new Line(3, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE)]
 
-        constructor() { }
+        private _boardState: Array<Line>;
+        private _startingColor = Table.Color.EMPTY;
+
+        constructor(playerColor: Table.Color = Table.Color.BLACK) {
+            if(playerColor == Table.Color.EMPTY)
+            {
+                // wait for color input. Should probably never reach this. Assert?
+            }
+
+            this._startingColor = playerColor;
+            this._boardState = playerColor == Table.Color.BLACK ? Board.DefaultBoardState : Board.WhiteBoardState;
+        }
 
         public reset(): void {
-            this._boardState = Board._defaultBoardState;
+            this._boardState = this._startingColor == Table.Color.BLACK ? Board.DefaultBoardState : Board.WhiteBoardState;
         }
 
         public getLine(line: number): Line {
@@ -102,16 +133,15 @@ export namespace Table {
                 console.log(line.toString() + delim);
             });
         }
-
     }
 
     export class BoardManager {
         private static _instance: Publisher.PublisherManager;
 
-        public _board: Board;
+        public Board: Board;
 
         constructor() {
-            this._board = new Board();
+            this.Board = new Board();
         }
 
         public printBoard() {
@@ -121,8 +151,5 @@ export namespace Table {
         public doMoves() {
 
         }
-
-
     }
-
 }   // namespace Table
