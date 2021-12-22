@@ -1,4 +1,4 @@
-import { Publisher } from '../Tech/PublisherManager';
+import { DieRolled, GameManager, Move } from './GameManager'
 
 export namespace Table {
 
@@ -8,49 +8,76 @@ export namespace Table {
         WHITE = 1
     }
 
-    var colors: { [id: number]: string } = {};
-    colors[-1] = "Empty";
-    colors[0] = "Black";
-    colors[1] = "White";
+    export enum PiecePosition {
+        Out = 0,
+        In = 1,
+        Faulted = 33
+    }
+
+    var colors: { [id: number]: string } = {}
+    colors[-1] = "Empty"
+    colors[0] = "Black"
+    colors[1] = "White"
 
     export class Line {
+        static Out = new Line(PiecePosition.Out, -1)
+        static BlackFaulted = new Line(PiecePosition.Faulted, 0)
+        static WhiteFaulted = new Line(PiecePosition.Faulted, 1)
         static LineCounter = 0;
 
-        private _lineId: number = 0;
-        private _pieces: number = 0;
-        private _color: Color;
+        private _canChangeColor: boolean = true;
+        private _lineId: number = 0
+        private _pieces: number = 0
+        private _color: Color
 
         constructor(pieces: number, Color: Color) {
-            this._lineId = Line.LineCounter++;
-            this._pieces = pieces;
-            this._color = Color;
+            this._lineId = Line.LineCounter++
+            this._pieces = pieces
+            this._canChangeColor = pieces <= 1
+            this._color = Color
+        }
+
+        public get canChangeColor(): boolean {
+            return this._canChangeColor
         }
 
         public get lineId(): number {
-            return this._lineId;
+            return this._lineId
         }
 
         public get pieces(): number {
-            return this._pieces;
+            return this._pieces
         }
+
         public set pieces(value: number) {
-            this._pieces = value;
+            this._pieces = value
+            this._canChangeColor = value <= 1
+        }
+
+        public get color(): Color {
+            return this._color
         }
 
         public resetLineCounter() {
-            console.log("Resetting Line Counter");
+            console.log("Resetting Line Counter for line " + this._lineId)
 
-            Line.LineCounter = 0;
+            Line.LineCounter = 0
         }
 
         public isEmpty(): boolean {
-            return this._color == Color.EMPTY;
+            return this._color == Color.EMPTY
+        }
+
+        public canPlaceColor(color: Color): boolean
+        {
+            //debug check for color on out?
+            return this._canChangeColor || this.color === color
         }
 
         checkForColorChanges(): void {
             if (this._pieces == 0) {
-                this._color = Color.EMPTY;
-                this._color = ~this._color;
+                this._color = Color.EMPTY
+                this._color = ~this._color
             }
             else {
                 this._color = this._pieces < 0 ? -this._color : this._color;
@@ -58,97 +85,221 @@ export namespace Table {
         }
 
         public static updateLines(delta: number, line1: Line, line2: Line) {
-            if (Math.abs(delta) > 4) {
-                throw new Error("Delta shouldn't be higher than 4");
+            if (Math.abs(delta) > 4 && delta > line1.pieces) {
+                throw new Error("UpdateLines error: delta " + delta)
             }
 
-            line1.pieces += delta;
-            line1.checkForColorChanges();
+            line1.pieces -= delta
+            line1.checkForColorChanges()
+
+            switch (line2.lineId) {
+                case PiecePosition.Out:
+                    break;// todo
+                case PiecePosition.Faulted:
+
+                    break;
+            }
+
+            if (line2.lineId == PiecePosition.Out || line2.lineId == PiecePosition.Faulted) {
+
+            }
 
             if (line2 != null) {
-                line2.pieces += delta;
-                line2.checkForColorChanges();
+                line2.pieces += delta
+                line2.checkForColorChanges()
             }
+        }
+
+        private isOut(): boolean
+        {
+            return this.lineId === 0 || this.lineId === 25
+        }
+
+        private canMoveBy(delta: number): boolean
+        {
+            if(this.isOut() || delta === 0)
+            {
+                return false
+            }
+
+            var nextLine = this.nextLine(delta)
+            return nextLine.canPlaceColor(this.color)
+        }
+
+        private nextLine(delta: number): Line
+        {
+            return Board.Instance.getLine(this.lineId + delta)
+        }
+
+        //private thatBlanaoDie(): DieRolled{}
+
+        private generateMovesForDie(die: DieRolled): Array<Move>    //Also call on reverse die
+        {
+            var ret = new Array<Move>()
+            
+            var nextLine = this.nextLine(die.First)
+
+            if(this.canMoveBy(die.First))
+            {
+                ret.push(new Move(this, nextLine))
+                die.useMove(die.First)
+            }
+
+            var currentLine = nextLine
+            nextLine = nextLine.nextLine(die.First)
+
+
+            while(die.MovesAvailable > 0 && currentLine.canMoveBy(die.Second))
+            {
+                ret.push(new Move(currentLine, nextLine))
+                die.useMove(die.Second)
+
+                currentLine = nextLine
+                nextLine = currentLine.nextLine(die.Second)
+            }
+
+            if(ret.length === 0)
+            {
+                console.warn('No moves for line ' + this.toString + ' die ' + die.toString)
+            }
+
+            return ret
+        }
+
+        handlePieceOut() {
+
+        }
+
+        handlePieceFaulted() {
+
+        }
+
+        public onClick()
+        {
+            var playerColor = this._color
+            if(this._color != playerColor)
+            {
+                //Invalid
+                return
+            }
+
+            var die = GameManager.Instance.Die
+            var movesAvailable = this.generateMovesForDie(die)
+            //show on screen
+
         }
 
         public toString(): String {
             return String(this._pieces === 0 ?
                 colors[this._color] :
-                this._pieces + "  " + colors[this._color] + (this._pieces > 1 ? "s" : ""));
+                this._pieces + "  " + colors[this._color] + (this._pieces > 1 ? "s" : ""))
         }
     }
 
     export class Board {
-
-        static LinesPerQuarter = 6;
+        static Instance: Board
+        static LinesPerQuarter = 6
 
         //Starting bottom right, playing black
         private static DefaultBoardState: Array<Line> =
-            [new Line(2, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK),
-             new Line(0, Color.EMPTY), new Line(3, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
-             new Line(2, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
-             new Line(0, Color.EMPTY), new Line(3, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK)]
+            [new Line(0, Color.EMPTY),
+            new Line(2, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK),
+            new Line(0, Color.EMPTY), new Line(3, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK),
+            new Line(0, Color.EMPTY), new Line(3, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
+            new Line(2, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
+            new Line(0, Color.EMPTY)]
 
         private static WhiteBoardState: Array<Line> =
             [new Line(2, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
-             new Line(0, Color.EMPTY), new Line(3, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK),
-             new Line(2, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK),
-             new Line(0, Color.EMPTY), new Line(3, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE)]
+            new Line(0, Color.EMPTY), new Line(3, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK),
+            new Line(0, Color.EMPTY), new Line(3, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
+            new Line(2, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK)]
 
-        private _boardState: Array<Line>;
-        private _startingColor = Table.Color.EMPTY;
+            private _startingColor = Table.Color.EMPTY;
+            private BoardState: Array<Line>;
 
         constructor(playerColor: Table.Color = Table.Color.BLACK) {
-            if(playerColor == Table.Color.EMPTY)
+            if(Board.Instance == null)
             {
+                Board.Instance = this
+            }
+            
+            if (playerColor == Table.Color.EMPTY) {
                 // wait for color input. Should probably never reach this. Assert?
             }
 
-            this._startingColor = playerColor;
-            this._boardState = playerColor == Table.Color.BLACK ? Board.DefaultBoardState : Board.WhiteBoardState;
+            this._startingColor = playerColor
+            this.BoardState = playerColor == Table.Color.BLACK ? Board.DefaultBoardState : Board.WhiteBoardState;
         }
 
         public reset(): void {
-            this._boardState = this._startingColor == Table.Color.BLACK ? Board.DefaultBoardState : Board.WhiteBoardState;
+            this.BoardState = this._startingColor == Table.Color.BLACK ? Board.DefaultBoardState : Board.WhiteBoardState;
         }
 
-        public getLine(line: number): Line {
-            return this._boardState[line];
+        public getLine(line: number): Line
+        {
+            // Sanity checks
+
+            if(0 <= line)
+            {
+                if(line >= Board.Instance.BoardState.length)
+                {
+                    return this.BoardState[25]
+                }
+
+                return this.BoardState[0]
+            }
+            return this.BoardState[line]
+        }
+
+        public getBlackLines(): Array<Line> {
+            var lines = new Array<Line>()
+
+            this.BoardState.forEach((line) => {
+                if (line.color === Color.BLACK) {
+                    lines.push(line)
+                }
+            });
+
+            return lines;
         }
 
         public isLineEmpty(line: number): boolean {
-            return this._boardState[line].isEmpty();
+            return this.BoardState[line].isEmpty()
+        }
+
+        public getMovesFrom():Array<Move>
+        {
+            return new Array<Move>(0)
         }
 
         public printBoard() {
-            var delim: string;
-            this._boardState.forEach((line, index) => {
+            var delim: string
+            this.BoardState.forEach((line, index) => {
                 if (!(index % 12)) {
-                    delim = "\n";
+                    delim = "\n"
                 } else if (!(index % 6)) {
-                    delim = "\t";
+                    delim = "\t"
                 } else {
-                    delim = "  ";
+                    delim = "  "
                 }
-                console.log(line.toString() + delim);
+                console.log(line.toString() + delim)
             });
         }
     }
 
     export class BoardManager {
-        private static _instance: Publisher.PublisherManager;
-
-        public Board: Board;
+        public Board: Board
 
         constructor() {
-            this.Board = new Board();
+            this.Board = new Board()
         }
 
         public printBoard() {
 
         }
 
-        public doMoves() {
+        public doMoves(moves: Array<Move>) {
 
         }
     }

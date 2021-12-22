@@ -1,4 +1,4 @@
-import Prando from 'prando';
+import Prando from 'prando'
 import { Table } from '../Game/BoardManager'
 
 export enum GamePhase {
@@ -10,15 +10,25 @@ export enum GamePhase {
     AllDone,
 }
 
-export class Client {
-    private _currentPhase: GamePhase = GamePhase.Inactive;
+const MovesForMT = 42
+
+export class Player {
+    private _currentPhase: GamePhase = GamePhase.Inactive
+    private _color = Table.Color.BLACK
+    private _movesToExit = 0 // !
+    private _hasFaultedPieces = false
+
+    constructor(color: Table.Color)
+    {
+        this._color = color
+    }
 
     public get Phase(): GamePhase {
-        return this._currentPhase;
+        return this._currentPhase
     }
 
     public set Phase(phase: GamePhase) {
-        this._currentPhase = phase;
+        this._currentPhase = phase
     }
 }
 
@@ -27,43 +37,162 @@ export class Move {
     private _newLine: Table.Line
     private _color: Table.Color
 
-    constructor(oldLine: Table.Line, newLine: Table.Line, color: Table.Color) {
-        this._oldLine = oldLine;
-        this._newLine = newLine;
-        this._color = color;
+    constructor(oldLine: Table.Line, newLine: Table.Line) {
+        this._oldLine = oldLine
+        this._newLine = newLine
+        this._color = this._oldLine.color
     }
 
-    public doMove(delta: number, color: Table.Color) {
+    public doMove(delta: number, color: Table.Color): boolean {
+        if(this._newLine.color != this._oldLine.color)
+        {
+            if(!this._newLine.canChangeColor)
+            {
+                console.log("Invalid move!: " + this.toString)
 
-        this._color = color;
+                return false
+            }
+        }
+
+        Table.Line.updateLines(delta, this._oldLine, this._newLine)
+        this._color = color
+
+        return true
+    }
+
+    public toString(): string
+    {
+        return String("Old Line + " + this._oldLine + " New Line " + this._newLine)
+    }
+}
+
+export class DieRolled
+{
+    public First: number = -1
+    public Second: number = -2
+    public isDouble: boolean = false
+    private _movesAvailable: number = 0
+
+    constructor(first: number, second: number)
+    {
+        this.First = first
+        this.Second = second
+
+        this.isDouble = this.First  === this.Second
+        this._movesAvailable = this.isDouble ? 4 : 2
+    }
+
+    public set(first: number, second: number)
+    {
+        this.First = first
+        this.Second = second
+
+        this.isDouble = this.First  === this.Second
+        this._movesAvailable = this.isDouble ? 4 : 2
+    }
+
+    public get MovesAvailable(): number
+    {
+        return this._movesAvailable
+    }
+
+    public set MovesAvailable(value: number)
+    {
+        this._movesAvailable = value
+    }
+
+    public reverse(): DieRolled
+    {
+        return new DieRolled(this.Second, this.First)
+    }
+
+    public useMove(value: number): DieRolled
+    {
+        this.First = this.First == value ? (this.isDouble ? this.First : 0) : this.First
+        //Don't care about second tbh
+
+        if(this._movesAvailable > 0)
+        {
+            this._movesAvailable--
+        }
+        else
+        {
+            this.First = 0
+            this.Second = 0
+        }
+
+        return this
+    }
+
+    public toString(): string
+    {
+        return this.First + ' ' + this.Second + ' ' + this.isDouble + ' ' + this.MovesAvailable
     }
 }
 
 export class GameManager {
+    static SEED = 1554
+    static RNG = new Prando(GameManager.SEED)
 
-    static SEED = 1554;
-    static RNG = new Prando(GameManager.SEED);
+    private static _instance: GameManager
 
-    private _clients: Array<Client> = new Array<Client>();
+    private _board: Table.Board
+
+    private _player: Array<Player> = new Array<Player>(2)
+    private _dieRolled: DieRolled = new DieRolled(0, 0)
+
+    private _movesLeft: number = 0
+
+    constructor()
+    {
+        this._board = Table.Board.Instance;
+    }
+
+    public static get Instance() {
+        return this._instance || (this._instance = new this())
+    }
+
+    public initialize(board: Table.Board)
+    {
+        this._board = board
+    }
+
+    public get Die(): DieRolled
+    {
+        return this._dieRolled
+    }
+
+    public get MovesLeft(): number{
+        return this._movesLeft
+    }
     
     public rollDie(): number {
-        return GameManager.RNG.nextInt(1, 7);
+        return GameManager.RNG.nextInt(1, 7)
     };
 
-    computePossibleMoves(firstDie: number, secondDie: number): Array<Move>
+    computeMaxMoves(firstDie: number, secondDie: number): Array<Move>
     {
         var solutions: Array<Move> = new Array<Move>();
+        // Always store the maximum number of moves
+
+        var lines = this._board.getBlackLines();
+        var offsets = firstDie === secondDie ? 
+            [firstDie, secondDie] : 
+            [firstDie, firstDie, firstDie, firstDie]
 
         return solutions;
     }
 
-    advancePhase(client: Client, phase: GamePhase) {
-        switch (client.Phase) {
+    advancePhase(player: Player) {
+        switch (player.Phase) {
             case GamePhase.Inactive:
+                // Not in game
                 break
             case GamePhase.Rolling:
-                const firstDie = this.rollDie()
-                const secondDie = this.rollDie()
+                this._dieRolled.set(this.rollDie(), this.rollDie())
+
+                this.handlePhaseChange(player, this._dieRolled.isDouble ? GamePhase.Double : GamePhase.FirstMove)
+
                 break
             case GamePhase.Double:
                 break
@@ -76,7 +205,24 @@ export class GameManager {
         }
     }
 
-    handlePhaseChange() {
+    private doFirstMove()
+    {
+        if(this._dieRolled.isDouble)
+        {
+            this.handlePhaseChange
+        }
+    }
+
+    handlePhaseChange(player: Player, phase: GamePhase) {
+        switch(phase)
+        {
+            case GamePhase.Double:
+                // Check for number of possible moves
+                // firstMove twice
+                break
+            case GamePhase.FirstMove:
+                break
+        }
     }
 
     recordMove(): boolean {
