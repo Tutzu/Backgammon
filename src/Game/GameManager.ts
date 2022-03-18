@@ -23,6 +23,16 @@ export class Player {
         this._color = color
     }
 
+    public get Color(): Table.Color
+    {
+        return this._color
+    }
+
+    public get HasFaultedPieces(): boolean
+    {
+        return this._hasFaultedPieces
+    }
+
     public get Phase(): GamePhase {
         return this._currentPhase
     }
@@ -43,18 +53,18 @@ export class Move {
         this._color = this._oldLine.color
     }
 
-    public doMove(delta: number, color: Table.Color): boolean {
+    public doMove(color: Table.Color): boolean {
         if(this._newLine.color != this._oldLine.color)
         {
             if(!this._newLine.canChangeColor)
             {
-                console.log("Invalid move!: " + this.toString)
+                console.log("Invalid move!: " + this.toString())
 
                 return false
             }
         }
 
-        Table.Line.updateLines(delta, this._oldLine, this._newLine)
+        Table.Line.updateLines(this._oldLine, this._newLine)
         this._color = color
 
         return true
@@ -75,11 +85,7 @@ export class DieRolled
 
     constructor(first: number, second: number)
     {
-        this.First = first
-        this.Second = second
-
-        this.isDouble = this.First  === this.Second
-        this._movesAvailable = this.isDouble ? 4 : 2
+        this.set(first, second)
     }
 
     public set(first: number, second: number)
@@ -138,6 +144,7 @@ export class GameManager {
 
     private _board: Table.Board
 
+    private _currentPlayerIndex = 0
     private _player: Array<Player> = new Array<Player>(2)
     private _dieRolled: DieRolled = new DieRolled(0, 0)
 
@@ -166,21 +173,29 @@ export class GameManager {
         return this._movesLeft
     }
     
+    private advanceTurn()
+    {
+        this._currentPlayerIndex = (this._currentPlayerIndex + 1) % 2
+        // Notify players
+    }
+
+    public currentPlayer(): Player
+    {
+        return this._player[this._currentPlayerIndex]
+    }
+
     public rollDie(): number {
         return GameManager.RNG.nextInt(1, 7)
     };
 
-    computeMaxMoves(firstDie: number, secondDie: number): Array<Move>
+    public getUserColor(): Table.Color
     {
-        var solutions: Array<Move> = new Array<Move>();
-        // Always store the maximum number of moves
+        return this._player[0].Color    // Probably do something else instead of verbose 0 and 1 for these, as this might not work
+    }
 
-        var lines = this._board.getBlackLines();
-        var offsets = firstDie === secondDie ? 
-            [firstDie, secondDie] : 
-            [firstDie, firstDie, firstDie, firstDie]
-
-        return solutions;
+    public getOpponentColor(): Table.Color
+    {
+        return this._player[1].Color
     }
 
     advancePhase(player: Player) {
@@ -190,6 +205,8 @@ export class GameManager {
                 break
             case GamePhase.Rolling:
                 this._dieRolled.set(this.rollDie(), this.rollDie())
+
+                // make lines clickable
 
                 this.handlePhaseChange(player, this._dieRolled.isDouble ? GamePhase.Double : GamePhase.FirstMove)
 
@@ -201,6 +218,8 @@ export class GameManager {
             case GamePhase.SecondMove:
                 break
             case GamePhase.AllDone:
+                this.advanceTurn()
+                //this.handlePhaseChange(player, )
                 break
         }
     }
@@ -209,7 +228,7 @@ export class GameManager {
     {
         if(this._dieRolled.isDouble)
         {
-            this.handlePhaseChange
+            //this.handlePhaseChange()
         }
     }
 

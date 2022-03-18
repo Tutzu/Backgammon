@@ -8,10 +8,10 @@ export namespace Table {
         WHITE = 1
     }
 
-    export enum PiecePosition {
+    export enum Position {
         Out = 0,
         In = 1,
-        Faulted = 33
+        Faulted = 25
     }
 
     var colors: { [id: number]: string } = {}
@@ -20,9 +20,6 @@ export namespace Table {
     colors[1] = "White"
 
     export class Line {
-        static Out = new Line(PiecePosition.Out, -1)
-        static BlackFaulted = new Line(PiecePosition.Faulted, 0)
-        static WhiteFaulted = new Line(PiecePosition.Faulted, 1)
         static LineCounter = 0;
 
         private _canChangeColor: boolean = true;
@@ -59,7 +56,7 @@ export namespace Table {
         }
 
         public resetLineCounter() {
-            console.log("Resetting Line Counter for line " + this._lineId)
+            console.log("Resetting Line Counter")
 
             Line.LineCounter = 0
         }
@@ -84,35 +81,17 @@ export namespace Table {
             }
         }
 
-        public static updateLines(delta: number, line1: Line, line2: Line) {
-            if (Math.abs(delta) > 4 && delta > line1.pieces) {
-                throw new Error("UpdateLines error: delta " + delta)
-            }
-
-            line1.pieces -= delta
+        public static updateLines(line1: Line, line2: Line) {
+            line1.pieces--
             line1.checkForColorChanges()
 
-            switch (line2.lineId) {
-                case PiecePosition.Out:
-                    break;// todo
-                case PiecePosition.Faulted:
-
-                    break;
-            }
-
-            if (line2.lineId == PiecePosition.Out || line2.lineId == PiecePosition.Faulted) {
-
-            }
-
-            if (line2 != null) {
-                line2.pieces += delta
-                line2.checkForColorChanges()
-            }
+            line2.pieces++
+            line2.checkForColorChanges()
         }
 
         private isOut(): boolean
         {
-            return this.lineId === 0 || this.lineId === 25
+            return this.lineId === Position.Out || this.lineId === Position.Faulted
         }
 
         private canMoveBy(delta: number): boolean
@@ -160,8 +139,8 @@ export namespace Table {
 
             if(ret.length === 0)
             {
-                console.warn('No moves for line ' + this.toString + ' die ' + die.toString)
-            }
+                console.warn('No moves for line ' + this.toString() + ' die ' + die.toString())
+            }            
 
             return ret
         }
@@ -184,7 +163,10 @@ export namespace Table {
             }
 
             var die = GameManager.Instance.Die
+            var reverseDie = die.reverse()
             var movesAvailable = this.generateMovesForDie(die)
+            var reverseMovesAvailable = this.generateMovesForDie(reverseDie)
+
             //show on screen
 
         }
@@ -210,13 +192,15 @@ export namespace Table {
             new Line(0, Color.EMPTY)]
 
         private static WhiteBoardState: Array<Line> =
-            [new Line(2, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
+            [new Line(0, Color.EMPTY),
+            new Line(2, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
             new Line(0, Color.EMPTY), new Line(3, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK),
             new Line(0, Color.EMPTY), new Line(3, Color.BLACK), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.WHITE),
-            new Line(2, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK)]
+            new Line(2, Color.WHITE), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(0, Color.EMPTY), new Line(5, Color.BLACK),
+            new Line(0, Color.EMPTY)]
 
-            private _startingColor = Table.Color.EMPTY;
-            private BoardState: Array<Line>;
+            private _startingColor = Table.Color.EMPTY
+            private BoardState: Array<Line>
 
         constructor(playerColor: Table.Color = Table.Color.BLACK) {
             if(Board.Instance == null)
@@ -244,10 +228,10 @@ export namespace Table {
             {
                 if(line >= Board.Instance.BoardState.length)
                 {
-                    return this.BoardState[25]
+                    return this.BoardState[Position.Faulted]
                 }
 
-                return this.BoardState[0]
+                return this.BoardState[Position.Out]
             }
             return this.BoardState[line]
         }
